@@ -5,7 +5,7 @@
 #include <QPlainTextEdit>
 #include "msglistitem.h"
 
-MsgListItem::MsgListItem(const QString &name, const QString &msg, bool isFriendMsg, QDateTime dateTime)
+MsgListItem::MsgListItem(const QString &msg, bool isFriendMsg, QDateTime dateTime)
 {
     m_labIcon = new QLabel(this);
     QPixmap pixmap;

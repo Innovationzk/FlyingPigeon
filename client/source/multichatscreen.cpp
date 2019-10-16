@@ -13,12 +13,14 @@
 #include "multichatfriendlistitem.h"
 #include "friendlistitem.h"
 #include "msglistitem.h"
+#include "commondef.h"
+#include "clientapp/clientapp.h"
 
 #define BUTTON_WIDTH 80
 #define BUTTON_HEIGHT 26
 
 MultiChatScreen::MultiChatScreen(const QVector<QString> &vecFriendName, const QVector<unsigned int> &clientNo):
-m_vecCliendNo(clientNo)
+m_vecClientNo(clientNo)
 {
     if (vecFriendName.size()<2)
     {
@@ -109,12 +111,30 @@ void MultiChatScreen::onBtnSendClicked()
 {
     QString text = m_inputWidget->toPlainText();
     m_inputWidget->clear();
-    if (!text.isEmpty())
+
+    if (text.isEmpty())
     {
-        QListWidgetItem *listWidgetItem= new QListWidgetItem(m_chatListWidget);
-        MsgListItem *msgListItem = new MsgListItem(UIController::getUserName(),text,false);
-        listWidgetItem->setSizeHint(QSize(m_chatListWidget->width(),msgListItem->height()));
-        m_chatListWidget->setItemWidget(listWidgetItem,msgListItem);
+        return;
     }
+
+    if (m_vecClientNo.size()>6)
+    {
+        qDebug("[%s]: error: targets number over 16\n", __FUNCTION__);
+        return;
+    }
+
+    ui_clt_post_msg_req msg;
+    msg.clientNum=m_vecClientNo.size();
+    for (int i=0;i<m_vecClientNo.size();++i)
+    {
+        msg.clientNo[i]=m_vecClientNo[i];
+    }
+    strcpy(msg.msgContent,text.toLocal8Bit().data());
+    CLIENTAPP::Post(EV_UI_CLT_POST_MSG_REQ,&msg,sizeof(msg));
+
+    QListWidgetItem *listWidgetItem= new QListWidgetItem(m_chatListWidget);
+    MsgListItem *msgListItem = new MsgListItem(text,false);
+    listWidgetItem->setSizeHint(QSize(m_chatListWidget->width(),msgListItem->height()));
+    m_chatListWidget->setItemWidget(listWidgetItem,msgListItem);
 
 }

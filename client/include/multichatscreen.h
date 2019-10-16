@@ -25,7 +25,7 @@ public slots:
     void onBtnSendClicked();
 
 private:
-    QVector<unsigned int> m_vecCliendNo;
+    QVector<unsigned int> m_vecClientNo;
     QPushButton *m_btnSend;
     QPushButton *m_btnCancel;
     QListWidget *m_friendListWidget;

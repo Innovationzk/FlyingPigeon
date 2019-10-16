@@ -2,9 +2,14 @@
 #include "../include/fileappinstance.h"
 #include "../include/msgappdata.h"
 #include "../include/msgappinstance.h"
-
-// TODO:正式版删除
 #include <iostream>
+/****************TODO:正式发布版需要修改*****************/
+#ifdef _DEBUG
+#define OspPrintf(TRUE, FALSE, ...) printf(__VA_ARGS__)
+#else
+#define OspPrintf(a, b, ...)
+#endif
+/********************************************************/
 
 zTemplate<FileAppInstance, FILE_APP_INSTANCE_NUMBER_SERVER, FileAppData, MAX_ALIAS_LENGTH_SERVER> fileApp;
 zTemplate<MsgAppInstance, MSG_APP_INSTANCE_NUMBER_SERVER, MsgAppData, MAX_ALIAS_LENGTH_SERVER> msgApp;
@@ -12,16 +17,24 @@ zTemplate<MsgAppInstance, MSG_APP_INSTANCE_NUMBER_SERVER, MsgAppData, MAX_ALIAS_
 int main()
 {
 #ifdef _DEBUG
-	OspInit(TRUE, TELNET_PORT_SERVER);
+    if (FALSE == IsOspInitd())
+    {
+        OspInit(TRUE, TELNET_PORT_SERVER);
+    }
 #endif
 
-	OspCreateTcpNode(0, LISTEN_PORT_SERVER);
+	if (INVALID_SOCKET == OspCreateTcpNode((u32)inet_addr( "0.0.0.0" ), LISTEN_PORT_SERVER, TRUE))
+    {
+        OspPrintf(TRUE, FALSE, "[%s]: error: cannot create TcpNode\n", __FUNCTION__);
+    }
 	fileApp.CreateApp(FILE_APP_NAME_SERVER, FILE_APP_ID_SERVER, FILE_APP_PRIORITY_SERVER, FILE_APP_QUEUE_SIZE_SERVER);
 	msgApp.CreateApp(MSG_APP_NAME_SERVER, MSG_APP_ID_SERVER, MSG_APP_PRIORITY_SERVER, MSG_APP_QUEUE_SIZE_SERVER);
 
-	// TODO:正式版删除
+    OspSetPrompt("server->>");
+    
+
 	char chr;
-	std::cout << "请输入编号：\n1：输出在线客户端列表\n2：输出所有客户端列表\n";
+	//std::cout << "请输入编号：\n1：输出在线客户端列表\n2：输出所有客户端列表\n";
 	while (TRUE)
 	{
 		OspDelay(100);
@@ -42,10 +55,16 @@ int main()
 			std::cout << sw.write(msgApp.getClientList());
 			break;
 		}
+        case '3':
+            {
+                OspPrintf(TRUE, FALSE, "[%s]: local ip:%d\n", __FUNCTION__, OspNodeIpGet(0));
+                break;
+            }
 		default:
 			break;
 		}
 	}
+    OspQuit();
 
 	return 0;
 }

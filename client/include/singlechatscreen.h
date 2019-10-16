@@ -23,6 +23,7 @@ signals:
 
 public slots:
     void onBtnSendClicked();
+    void onReceiveMsg(const QString &msg);
 
 private:
     QLabel *m_labFriendIcon;

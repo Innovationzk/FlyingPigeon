@@ -118,7 +118,7 @@ LoginScreen::LoginScreen(QWidget *parent) : QWidget(parent)
     qRegisterMetaType<u16>("u16");
     qRegisterMetaType<clt_ui_connect_result_ntf>("clt_ui_connect_result_ntf");
     connect(uiController, SIGNAL(sigServerStatus(u16)), this, SLOT(onNotifyServerStatus(u16)));
-    connect(uiController, SIGNAL(sigConnectReult(u16, clt_ui_connect_result_ntf)), this, SLOT(onNotifyConnectResult(u16, clt_ui_connect_result_ntf)));
+    connect(uiController, SIGNAL(sigConnectReult(clt_ui_connect_result_ntf)), this, SLOT(onNotifyConnectResult(clt_ui_connect_result_ntf)));
 }
 
 LoginScreen::~LoginScreen()
@@ -170,18 +170,30 @@ void LoginScreen::onNotifyServerStatus(u16 eventType)
     }
 }
 
-void LoginScreen::onNotifyConnectResult(u16 eventType, clt_ui_connect_result_ntf result)
+void LoginScreen::onNotifyConnectResult(clt_ui_connect_result_ntf result)
 {
-    printf("[%s]: called\n", __FUNCTION__);
+    qDebug("[%s]: called\n", __FUNCTION__);
 
     if (CONNECTION_SUCCEED == result.result)  // 连接成功
     {
-        printf("[%s]: login succeed\n", __FUNCTION__, eventType);
+        // 保存用户名至文件
+        QFile fileUserName("userName.txt");
+        fileUserName.open(QIODevice::WriteOnly);
+        if (fileUserName.isOpen())
+        {
+            fileUserName.write(m_userName.toUtf8());
+            fileUserName.close();
+        }
+        else
+        {
+            qDebug("[%s]: error: cannot open file userName.txt", __FUNCTION__);
+        }
+        qDebug("[%s]: login succeed\n", __FUNCTION__);
         emit sigConnectSucceed(m_userName);
     }
     else if (CLIENT_NUMBER_LIMIT == result.result)  // 服务端已达最大用户数限制
     {
-        printf("[%s]: login failed because of number limit\n", __FUNCTION__, eventType);
+        qDebug("[%s]: login failed because of number limit\n", __FUNCTION__);
         m_labelHint->setText(QString::fromLocal8Bit("登录失败，客户端已达最大用户数限制"));
         m_labelHint->show();
         m_labelLoading->hide();
@@ -189,7 +201,7 @@ void LoginScreen::onNotifyConnectResult(u16 eventType, clt_ui_connect_result_ntf
     }
     else if (OCCUPIED_USERNAME == result.result)    // 用户名被占用
     {
-        printf("[%s]: login failed because of number limit\n", __FUNCTION__, eventType);
+        qDebug("[%s]: login failed because of occupied username\n", __FUNCTION__);
         m_labelHint->setText(QString::fromLocal8Bit("登录失败，用户名被占用"));
         m_labelHint->show();
         m_labelLoading->hide();
@@ -219,9 +231,12 @@ void LoginScreen::onBtnLoginClicked()
         if (fileUserName.exists())
         {
             fileUserName.open(QIODevice::ReadOnly);
-            lastUserName = fileUserName.readAll();
-            fileUserName.close();
-            printf("[%s]: lastUserName: %s,UserName: %s\n", __FUNCTION__, lastUserName.toLocal8Bit().data(), m_userName.toLocal8Bit().data());
+            if (fileUserName.isOpen())
+            {
+                lastUserName = fileUserName.readAll();
+                fileUserName.close();
+            }
+            qDebug("[%s]: lastUserName: %s,UserName: %s\n", __FUNCTION__, lastUserName.toLocal8Bit().data(), m_userName.toLocal8Bit().data());
         }
         if (lastUserName == m_userName)  // 通知底层用户登录
         {
@@ -236,18 +251,6 @@ void LoginScreen::onBtnLoginClicked()
             ui_clt_regist_req registMsg;
             strcpy(registMsg.userName, m_userName.toLocal8Bit().data());
             CLIENTAPP::Post(EV_UI_CLT_REGIST_REQ, &registMsg, sizeof(registMsg));
-
-            // 保存用户名至文件
-            fileUserName.open(QIODevice::WriteOnly);
-            if (fileUserName.isOpen())
-            {
-                fileUserName.write(m_userName.toUtf8());
-                fileUserName.close();
-            }
-            else
-            {
-                printf("[%s]: error: cannot open file userName.txt", __FUNCTION__);
-            }
         }
     }
 }

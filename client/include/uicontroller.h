@@ -28,10 +28,16 @@ public:
 signals:
     /*************client_service回调时发送的信号*************/
     void sigServerStatus(u16 eventType);                     // 服务器状态
-    void sigConnectReult(u16 eventType, clt_ui_connect_result_ntf result);  // 登录结果
+    void sigConnectReult(clt_ui_connect_result_ntf result);  // 登录结果
     void sigRegistList(clt_ui_regist_list_ntf registList);   // 在线客户端列表
+    void sigSendMsgNack();                                   // 服务端离线，消息发送失败
+    void sigReceiveMsg(clt_ui_receive_msg_ntf msg);          // 收到消息
     void sigSendFileResult(u16 eventType);                   // 开始发送文件
     void sigNotifyFileProgress(u32 fileNo, u32 progress);    // 文件发送进度
+    void sigNotifySendFileFalied(u32 fileNo);                // 文件发送失败
+    void sigPostFileComplete(u32 fileNo);                    // 文件发送成功
+    void sigResendFile(u32 fileNo);                          // 文件校验失败，需要重新发送
+    void sigDisconnect();                                    // 连接断开
 
 public slots:
     void onNotifyConnectSucceed(QString userName);

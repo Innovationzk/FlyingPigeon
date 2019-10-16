@@ -30,11 +30,10 @@ UIController::UIController(QObject *parent):QObject(parent)
     m_loginScreen = new LoginScreen;
 
     // ÏÔÊ¾µÇÂ¼»­Ãæ
-    //m_loginScreen->show();
-    m_friendListScreen->show();
+    m_loginScreen->show();
+    //m_friendListScreen->show();
 
     connect(m_loginScreen, SIGNAL(sigConnectSucceed(QString)), this, SLOT(onNotifyConnectSucceed(QString)));
-    connect(this, SIGNAL(sigRegistList(clt_ui_client_list_ntf)), m_friendListScreen, SLOT(onUpdateClientList(clt_ui_client_list_ntf)));
 }
 
 UIController::~UIController()
@@ -58,6 +57,14 @@ void UIController::serviceCallBackFunc(u16 eventType, const void* content, u16 l
 
     switch (eventType)
     {
+    case EV_CLT_UI_POST_FILE_PROGRESS_NTF:
+    {
+        qDebug("[%s]: emit signal update progress\n", __FUNCTION__);
+        ui_clt_post_file_progress_ntf* msg = (ui_clt_post_file_progress_ntf*)content;
+        qDebug()<<msg->progress;
+        emit sm_uiController->sigNotifyFileProgress(msg->fileNo, msg->progress);
+        break;
+    }
     case EV_CLT_UI_REGIST_ACK:
     case EV_CLT_UI_REGIST_NACK:
     case EV_CLT_UI_LOG_IN_ACK:
@@ -70,13 +77,30 @@ void UIController::serviceCallBackFunc(u16 eventType, const void* content, u16 l
     case EV_CLT_UI_CONNECT_RESULT_NTF:
     {
         qDebug("[%s]: emit sigConnectReult\n", __FUNCTION__);
-        emit sm_uiController->sigConnectReult(eventType, *((clt_ui_connect_result_ntf*)(content)));
+        emit sm_uiController->sigConnectReult(*((clt_ui_connect_result_ntf*)(content)));
         break;
     }
     case EV_CLT_UI_REGIST_LIST_NTF:
     {
         qDebug("[%s]: emit regist_list_ntf\n", __FUNCTION__);
         emit sm_uiController->sigRegistList(*((clt_ui_regist_list_ntf*)(content)));
+        break;
+    }
+    case EV_CLT_UI_POST_MSG_ACK:
+    {
+        break;
+    }
+    case EV_CLT_UI_POST_MSG_NACK:
+    {
+        qDebug("[%s]: emit post_msg nack\n", __FUNCTION__);
+        emit sm_uiController->sigSendFileResult(eventType);
+        break;
+    }
+    case EV_CLT_UI_RECEIVE_MSG_NTF:
+    {
+        qDebug("[%s]: emit receive msg notify\n", __FUNCTION__);
+        clt_ui_receive_msg_ntf *msg = (clt_ui_receive_msg_ntf*)content;
+        emit sm_uiController->sigReceiveMsg(*msg);
         break;
     }
     case EV_CLT_UI_POST_FILE_ACK:
@@ -86,10 +110,32 @@ void UIController::serviceCallBackFunc(u16 eventType, const void* content, u16 l
         emit sm_uiController->sigSendFileResult(eventType);
         break;
     }
-    case EV_CLT_UI_POST_FILE_PROGRESS_NTF:
+	case EV_CLT_UI_POST_FILE_FAIL_NTF:
+	{
+        qDebug("[%s]: emit signal post file failed\n", __FUNCTION__);
+		clt_ui_post_file_fail_ntf* msg=(clt_ui_post_file_fail_ntf*)content;
+        emit sm_uiController->sigNotifySendFileFalied(msg->fileNo);
+        break;
+	}
+    case EV_CLT_UI_POST_FILE_COMPLETE_NTF:
     {
-        ui_clt_post_file_progress_ntf* msg = (ui_clt_post_file_progress_ntf*)content;
-        emit sm_uiController->sigNotifyFileProgress(msg->fileNo, msg->progress);
+        qDebug("[%s]: emit signal POST FILE COMPLETE\n", __FUNCTION__);
+        clt_ui_post_file_complete_ntf* msg=(clt_ui_post_file_complete_ntf*)content;
+        emit sm_uiController->sigPostFileComplete(msg->fileNo);
+        break;
+    }
+    case EV_CLT_UI_RESEND_FILE_NTF:
+    {
+        qDebug("[%s]: emit signal POST FILE COMPLETE\n", __FUNCTION__);
+        clt_ui_resend_file_ntf* msg=(clt_ui_resend_file_ntf*)content;
+        emit sm_uiController->sigResendFile(msg->fileNo);
+        break;
+    }
+    case EV_CLT_UI_DISC_NTF:
+    {
+        qDebug("[%s]: emit signal sigDisconnect\n", __FUNCTION__);
+        emit sm_uiController->sigDisconnect();
+        break;
     }
     default:
         break;
@@ -104,5 +150,6 @@ void UIController::onNotifyConnectSucceed(QString userName)
     m_loginScreen->close();
     m_friendListScreen->setUserName(userName);
     m_friendListScreen->show();
+    m_friendListScreen->restoreSendFileScreen();
 }
 

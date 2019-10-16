@@ -26,10 +26,10 @@ public slots:
     // 底层通知服务器状态
     void onNotifyServerStatus(u16 eventType);
     // 底层通知登录结果
-    void onNotifyConnectResult(u16 eventType, clt_ui_connect_result_ntf result);
+    void onNotifyConnectResult(clt_ui_connect_result_ntf result);
 
 private:
-    QString m_userName;               // 用户名
+    QString m_userName;             // 用户名
     QLabel *m_labelLoading;         // 文字：用户登录
     QLabel* m_labelHint;            // 提示
     QLabel* labelLogin;             // 加载按钮

@@ -11,6 +11,7 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QVector>
+#include "commondef.h"
 #include "friendlistscreen.h"
 #include "friendlistitem.h"
 #include "singlechatscreen.h"
@@ -38,7 +39,7 @@ FriendListScreen::FriendListScreen(QWidget* parent):
 
     // 用户图标
     m_labUserIcon = new QLabel(userInfo);
-    QPixmap userIcon("./resources/usericon.svg");
+    QPixmap userIcon("resources/usericon.svg");
     m_labUserIcon->setPixmap(userIcon.scaled(62, 62, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
     m_labUserIcon->move(15, 15);
 
@@ -71,25 +72,6 @@ FriendListScreen::FriendListScreen(QWidget* parent):
     m_friendListWidget->addItem(listWidgetItemm);
     m_friendListWidget->setItemWidget(listWidgetItemm, itemMyServer);
 
-
-    /****************测试用**************/
-    FriendListItem* item = new FriendListItem(QString::fromLocal8Bit("很长的名字"), 1);
-    item->setStatus(false);
-    QListWidgetItem* listWidgetItem = new QListWidgetItem();
-    listWidgetItem->setSizeHint(QSize(250, 65));
-    m_friendListWidget->addItem(listWidgetItem);
-    m_friendListWidget->setItemWidget(listWidgetItem, item);
-
-    FriendListItem* item1 = new FriendListItem(QString::fromLocal8Bit("赵云"), 2);
-    QListWidgetItem* listWidgetItem1 = new QListWidgetItem();
-    listWidgetItem1->setSizeHint(QSize(250, 65));
-    m_friendListWidget->addItem(listWidgetItem1);
-    m_friendListWidget->setItemWidget(listWidgetItem1, item1);
-
-    m_friendList[QString::fromLocal8Bit("很长的名字")]=item;
-    m_friendList[QString::fromLocal8Bit("赵云")]=item1;
-    /****************测试用***************/
-
     // “群发消息”按钮
     QWidget *massMsgContainer = new QWidget(this);
     massMsgContainer->setFixedHeight(30);
@@ -115,12 +97,20 @@ FriendListScreen::FriendListScreen(QWidget* parent):
     vLabelLayout->addWidget(massMsgContainer);
     this->setLayout(vLabelLayout);
 
+    // 发送文件窗口
+    m_sendFileScreen = new SendFileScreen();
+    QDir().mkdir("fileList");
+
     // 绑定信号
     UIController* uiController = UIController::getInstance();
-    qRegisterMetaType<clt_ui_regist_list_ntf>("clt_ui_regist_list_ntf");
-    connect(uiController, SIGNAL(sigRegistList(clt_ui_regist_list_ntf)), this, SLOT(onNotifyClientList(clt_ui_regist_list_ntf)));
     connect(m_friendListWidget,SIGNAL(itemDoubleClicked(QListWidgetItem*)),this,SLOT(onListItemDoubleClicked(QListWidgetItem*)));
     connect(m_btnMassMsg,SIGNAL(clicked(bool)),this,SLOT(onBtnMassMsgClicked()));
+    qRegisterMetaType<clt_ui_regist_list_ntf>("clt_ui_regist_list_ntf");
+    connect(uiController, SIGNAL(sigRegistList(clt_ui_regist_list_ntf)), this, SLOT(onNotifyClientList(clt_ui_regist_list_ntf)));
+    qRegisterMetaType<clt_ui_receive_msg_ntf>("clt_ui_receive_msg_ntf");
+    connect(uiController, SIGNAL(sigReceiveMsg(clt_ui_receive_msg_ntf)),this,SLOT(onReceiveMsg(clt_ui_receive_msg_ntf)));
+    connect(uiController,SIGNAL(sigDisconnect()),this,SLOT(onNotifyServerDisconnect()));
+    connect(uiController,SIGNAL(sigConnectReult(clt_ui_connect_result_ntf)),this,SLOT(onNotifyConnectReult(clt_ui_connect_result_ntf)));
 }
 
 FriendListScreen::~FriendListScreen()
@@ -154,6 +144,11 @@ FriendListScreen *FriendListScreen::getInstance()
 void FriendListScreen::closeEvent(QCloseEvent *)
 {
     QApplication::quit();
+}
+
+void FriendListScreen::restoreSendFileScreen()
+{
+    m_sendFileScreen->restoreExistFileList();
 }
 
 void FriendListScreen::onNotifyClientList(clt_ui_regist_list_ntf list)
@@ -197,18 +192,22 @@ void FriendListScreen::onNotifyClientList(clt_ui_regist_list_ntf list)
 
 void FriendListScreen::onListItemDoubleClicked(QListWidgetItem *listWidgetItem)
 {
+    qDebug()<<__FUNCTION__;
+
     FriendListItem *friendLiistItem = (FriendListItem *)(m_friendListWidget->itemWidget(listWidgetItem));
     unsigned int clientNo = friendLiistItem->getclientNo();
     QString clientName = friendLiistItem->getFriendName();
 
-    printf("friendLiistItem:%p,clientNo:%d,clientName:%s",friendLiistItem,clientNo,clientName.toUtf8().data());
-
-    if (clientName==QString("My server"))
+    qDebug()<<"friendLiistItem:"<<friendLiistItem<<"clientNo:"<<clientNo<<",clientName:"<<clientName.toUtf8().data();
+    qDebug()<<"m_sendFileScreen:"<<m_sendFileScreen;
+    if (clientName == QString("My server"))
     {
-        SendFileScreen *sendFileScreen = new SendFileScreen();
-        sendFileScreen->show();
+        qDebug()<<"My server DoubleClicked,m_sendFileScreen:"<<m_sendFileScreen;
+        m_sendFileScreen->show();
+        //m_sendFileScreen->restoreExistFileList();
         return;
     }
+    qDebug()<<"onOpenSingleChatScreen,clientName:"<<clientName<<",clientNo:"<<clientNo;
     onOpenSingleChatScreen(clientName,clientNo);
 }
 
@@ -272,6 +271,68 @@ void FriendListScreen::onOpenSingleChatScreen(const QString &clientName, unsigne
         m_chatScreenList[clientNo]->show();
     }
 }
+
+void FriendListScreen::onNotifySendMsgNack()
+{
+    QMessageBox::information(this,QString::fromLocal8Bit("提示"),QString::fromLocal8Bit("消息发送失败，请检查网络连接"));
+}
+
+void FriendListScreen::onReceiveMsg(clt_ui_receive_msg_ntf msg)
+{
+    u32 srcClientNo=msg.srcClientNo;
+    QString friendName;
+
+    for (QMap<QString, FriendListItem*>::iterator it = m_friendList.begin();it!=m_friendList.end();++it)
+    {
+        if (it.value()->getclientNo()==srcClientNo)
+        {
+            friendName=it.key();
+            break;
+        }
+    }
+    if (friendName.isEmpty())
+    {
+        qDebug("[%s]: error: srcCliendNo %d friendName not found\n", __FUNCTION__, srcClientNo);
+        return;
+    }
+
+    if (m_chatScreenList.find(srcClientNo)==m_chatScreenList.end())
+    {
+        SingleChatScreen *screen = new SingleChatScreen(friendName,srcClientNo);
+        screen->show();
+        m_chatScreenList[srcClientNo]=screen;
+        connect(screen,SIGNAL(sigSingleChatScreenClose(unsigned int)),this,SLOT(onSingleChatScreenClose(unsigned int)));
+        screen->onReceiveMsg(QString::fromLocal8Bit(msg.msgContent));
+    }
+    else
+    {
+        m_chatScreenList[srcClientNo]->hide();
+        m_chatScreenList[srcClientNo]->show();
+        m_chatScreenList[srcClientNo]->onReceiveMsg(QString::fromLocal8Bit(msg.msgContent));
+    }
+}
+
+void FriendListScreen::onNotifyServerDisconnect()
+{
+    QMessageBox::information(this,QString::fromLocal8Bit("提示"),QString::fromLocal8Bit("服务器连接断开，正在尝试重新连接"));
+    m_sendFileScreen->onBtnPauseAllClicked();
+    m_labUserStatus->setText(QString::fromLocal8Bit("状态：离线"));
+}
+
+void FriendListScreen::onNotifyConnectReult(clt_ui_connect_result_ntf result)
+{
+    if (CONNECTION_SUCCEED == result.result)  // 连接成功
+    {
+        m_labUserStatus->setText(QString::fromLocal8Bit("状态：在线"));
+    }
+}
+
+//void FriendListScreen::onSendFileScreenClose()
+//{
+//    qDebug()<<("[%s] called");
+//    disconnect(m_sendFileScreen,SIGNAL(sigCloseEvent()),this,SLOT(onSendFileScreenClose()));
+//    m_sendFileScreen=NULL;
+//}
 
 
 

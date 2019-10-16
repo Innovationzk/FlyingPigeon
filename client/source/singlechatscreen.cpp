@@ -8,10 +8,12 @@
 #include <QHBoxLayout>
 #include <QSpacerItem>
 #include <QPainter>
+#include "commondef.h"
 #include "uicontroller.h"
 #include "singlechatscreen.h"
 #include "friendlistitem.h"
 #include "msglistitem.h"
+#include "clientapp/clientapp.h"
 
 #define BUTTON_WIDTH 80
 #define BUTTON_HEIGHT 26
@@ -116,12 +118,32 @@ void SingleChatScreen::closeEvent(QCloseEvent *event)
 
 void SingleChatScreen::onBtnSendClicked()
 {
+    qDebug("[%s]: called\n", __FUNCTION__);
     QString text = m_inputWidget->toPlainText();
     m_inputWidget->clear();
+
+    ui_clt_post_msg_req msg;
+    msg.clientNum=1;
+    msg.clientNo[0]=m_clientNo;
+    strcpy(msg.msgContent,text.toLocal8Bit().data());
+    qDebug("[%s]: send msg,clientNum:%d,clientNo:%d,msgContent:%s\n", __FUNCTION__,msg.clientNum,msg.clientNo[0],msg.msgContent);
+    CLIENTAPP::Post(EV_UI_CLT_POST_MSG_REQ,&msg,sizeof(msg));
+
     if (!text.isEmpty())
     {
         QListWidgetItem *listWidgetItem= new QListWidgetItem(m_chatListWidget);
-        MsgListItem *msgListItem = new MsgListItem(UIController::getUserName(),text,false);
+        MsgListItem *msgListItem = new MsgListItem(text,false);
+        listWidgetItem->setSizeHint(QSize(m_chatListWidget->width()-20,msgListItem->height()));
+        m_chatListWidget->setItemWidget(listWidgetItem,msgListItem);
+    }
+}
+
+void SingleChatScreen::onReceiveMsg(const QString &msg)
+{
+    if (!msg.isEmpty())
+    {
+        QListWidgetItem *listWidgetItem= new QListWidgetItem(m_chatListWidget);
+        MsgListItem *msgListItem = new MsgListItem(msg,true);
         listWidgetItem->setSizeHint(QSize(m_chatListWidget->width()-10,msgListItem->height()));
         m_chatListWidget->setItemWidget(listWidgetItem,msgListItem);
     }

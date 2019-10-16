@@ -4,20 +4,20 @@
 #include <commondef.h>
 #include <md5.h>
 
-/****************TODO:正式发布版需要修改******************/
+/****************TODO:正式发布版需要修改******************
 #ifdef _DEBUG
 #define OspPrintf(TRUE, FALSE, ...) printf(__VA_ARGS__)
 #else
 #define OspPrintf(a, b, ...)
 #endif
-/********************************************************/
+********************************************************/
 
 extern zTemplate<FileAppInstance, FILE_APP_INSTANCE_NUMBER_CLIENT, FileAppData, MAX_ALIAS_LENGTH_CLIENT> fileApp;
 extern int serverNode;
 typedef void (*CallBack)(u16 eventType, const void* content, u16 length);
 extern CallBack CallBackFunc;
 
-FileAppInstance::FileAppInstance():
+FileAppInstance::FileAppInstance() :
     m_fileNo(0)
 {
     // 初始化状态
@@ -28,14 +28,14 @@ FileAppInstance::~FileAppInstance()
 {
 }
 
-void FileAppInstance::DaemonInstanceEntry(CMessage *const pMsg, CApp *pCApp)
+void FileAppInstance::DaemonInstanceEntry(CMessage* const pMsg, CApp* pCApp)
 {
-	OspPrintf(TRUE, FALSE, "[%s]: called, eventType is:%d\n", __FUNCTION__, pMsg->event);
+    OspPrintf(TRUE, FALSE, "[%s]: called, eventType is:%d\n", __FUNCTION__, pMsg->event);
 
-	switch (pMsg->event)
-	{
-	case EV_UI_CLT_POST_FILE_REQ:
-	{
+    switch (pMsg->event)
+    {
+    case EV_UI_CLT_POST_FILE_REQ:
+    {
         if (OspIsValidTcpNode(serverNode))  // 服务器在线，保存文件信息，分配发送任务
         {
             OspPrintf(TRUE, FALSE, "[%s]: server online,assign task\n", __FUNCTION__);
@@ -49,38 +49,38 @@ void FileAppInstance::DaemonInstanceEntry(CMessage *const pMsg, CApp *pCApp)
             CallBackFunc(EV_CLT_UI_POST_FILE_NACK, NULL, 0);
         }
         break;
-	}
-	case EV_UI_CLT_PAUSE_FILE_CMD:
-	{
-		PauseTask(pMsg);
-		break;
-	}
-	case EV_UI_CLT_PAUSE_ALL_FILE_CMD:
-	{
+    }
+    case EV_UI_CLT_PAUSE_FILE_CMD:
+    {
+        PauseTask(pMsg);
+        break;
+    }
+    case EV_UI_CLT_PAUSE_ALL_FILE_CMD:
+    {
         PauseAllTask();
         break;
-	}
-	case EV_UI_CLT_CONTINUE_FILE_CMD:
-	{
-		ContinueTask(pMsg);
-		break;
-	}
-	case EV_UI_CLT_CONTINUE_ALL_FILE_CMD:
-	{
+    }
+    case EV_UI_CLT_CONTINUE_FILE_CMD:
+    {
+        ContinueTask(pMsg);
+        break;
+    }
+    case EV_UI_CLT_CONTINUE_ALL_FILE_CMD:
+    {
         ContinueAllTask();
         break;
-	}
-	case EV_UI_CLT_CANCEL_FILE_CMD:
-	{
+    }
+    case EV_UI_CLT_CANCEL_FILE_CMD:
+    {
         ui_clt_cancel_file_cmd* msg = (ui_clt_cancel_file_cmd*)(pMsg->content);
-		CancelTask(msg->fileNo);
-		break;
-	}
-	case EV_UI_CLT_CANCEL_ALL_FILE_CMD:
-	{
-		CancelAllTask();
-		break;
-	}
+        CancelTask(msg->fileNo);
+        break;
+    }
+    case EV_UI_CLT_CANCEL_ALL_FILE_CMD:
+    {
+        CancelAllTask();
+        break;
+    }
     case OSP_DISCONNECT:
     {
         OspPrintf(TRUE, FALSE, "[%s]: server node discconnect,clear data\n", __FUNCTION__);
@@ -119,9 +119,9 @@ void FileAppInstance::DaemonInstanceEntry(CMessage *const pMsg, CApp *pCApp)
         }
         break;
     }
-	default:
-		break;
-	}
+    default:
+        break;
+    }
 }
 
 void FileAppInstance::AssignTask()
@@ -150,22 +150,22 @@ void FileAppInstance::AssignTask()
 
 void FileAppInstance::AssignTask(int insId)
 {
-	OspPrintf(TRUE, FALSE, "[%s]: called, target instance id: %d\n", __FUNCTION__, insId);
+    OspPrintf(TRUE, FALSE, "[%s]: called, target instance id: %d\n", __FUNCTION__, insId);
 
-	u32 nextFileNo = fileApp.GetNextFileTask();
-	if (0 == nextFileNo)  // 没有等待发送的文件
-	{
-		OspPrintf(TRUE, FALSE, "[%s]: no file waiting to be sent\n", __FUNCTION__);
-		return;
-	}
+    u32 nextFileNo = fileApp.GetNextFileTask();
+    if (0 == nextFileNo)  // 没有等待发送的文件
+    {
+        OspPrintf(TRUE, FALSE, "[%s]: no file waiting to be sent\n", __FUNCTION__);
+        return;
+    }
 
-	CApp* pCApp = (CApp*)(&fileApp);
-	FileAppInstance* pInstance = (FileAppInstance*)(pCApp->GetInstance(insId));
-	if (INSTANCE_STATUS_IDLE == pInstance->CurState())  // 如果Instance状态为空闲，为其分配文件发送任务
-	{
-		OspPrintf(TRUE, FALSE, "[%s]: assign task,insId:%d,fileNo:%d\n", __FUNCTION__, insId, nextFileNo);
-		pInstance->StartSendFile((u32)nextFileNo);
-	}
+    CApp* pCApp = (CApp*)(&fileApp);
+    FileAppInstance* pInstance = (FileAppInstance*)(pCApp->GetInstance(insId));
+    if (INSTANCE_STATUS_IDLE == pInstance->CurState())  // 如果Instance状态为空闲，为其分配文件发送任务
+    {
+        OspPrintf(TRUE, FALSE, "[%s]: assign task,insId:%d,fileNo:%d\n", __FUNCTION__, insId, nextFileNo);
+        pInstance->StartSendFile((u32)nextFileNo);
+    }
 }
 
 void FileAppInstance::PauseTask(CMessage* const pMsg)
@@ -184,7 +184,7 @@ void FileAppInstance::PauseTask(CMessage* const pMsg)
     else if (FileAppData::FILE_STATUS_SEND == status)  // 文件正在发送中，暂停发送
     {
         OspPrintf(TRUE, FALSE, "[%s]: fileNo:%d, current status： sending, pause sending\n", __FUNCTION__, fileNo);
-        CApp* pCApp = (CApp*)&fileApp;
+        CApp* pCApp = (CApp*)& fileApp;
         for (int i = 1; i <= FILE_APP_INSTANCE_NUMBER_CLIENT; i++)
         {
             FileAppInstance* fileAppInstance = (FileAppInstance*)(pCApp->GetInstance(i));
@@ -306,77 +306,90 @@ void FileAppInstance::CancelAllTask()
     }
 }
 
-void FileAppInstance::InstanceEntry(CMessage *const pMsg)
+void FileAppInstance::InstanceEntry(CMessage* const pMsg)
 {
     OspPrintf(TRUE, FALSE, "[%s]: called, curInstanceID is:%d,eventType is:%d\n", __FUNCTION__, m_instId, pMsg->event);
 
-	switch (pMsg->event)
-	{
-	case EV_SER_CLT_START_POST_FILE_ACK:
-	{
-		// 保存服务端Instance编号，发送第一条数据
-        er_clt_start_post_file_ack* msg = (er_clt_start_post_file_ack*)(pMsg->content);
-		m_serverInsId = msg->InstanceNo;
-		SendFileContent();
-		break;
-	}
-	case EV_SER_CLT_START_POST_FILE_NACK:
-	{
-        OspPrintf(TRUE, FALSE, "[%s]: insufficient server resources,pause all file\n", __FUNCTION__, m_instId, pMsg->event);
-		// 通知UI服务端资源不足
-		CallBackFunc(EV_CLT_UI_POST_FILE_NACK, NULL, 0);
-		// 更新文件状态
-		fileApp.SetFileStatus(m_fileNo, FileAppData::FILE_STATUS_PAUSE);
-		// 暂停所有等待中的文件
+    switch (pMsg->event)
+    {
+    case EV_SER_CLT_START_POST_FILE_ACK:
+    {
+        // 通知UI开始发送（通知发送进度0）
+        ui_clt_post_file_progress_ntf msgProgress;
+        msgProgress.fileNo = m_fileNo;
+        msgProgress.progress = 0;
+        CallBackFunc(EV_CLT_UI_POST_FILE_PROGRESS_NTF, &msgProgress, sizeof(msgProgress));
+        // 保存服务端Instance编号，发送第一条数据
+        ser_clt_start_post_file_ack* msg = (ser_clt_start_post_file_ack*)(pMsg->content);
+        m_serverInsId = msg->InstanceNo;
+        SendFileContent();
+        break;
+    }
+    case EV_SER_CLT_START_POST_FILE_NACK:
+    {
+        OspPrintf(TRUE, FALSE, "[%s]: insufficient server resources,pause all file\n", __FUNCTION__);
+        // 通知UI服务端资源不足
+        clt_ui_post_file_fail_ntf msg;
+        msg.fileNo = m_fileNo;
+        CallBackFunc(EV_CLT_UI_POST_FILE_FAIL_NTF, &msg, sizeof(msg));
+        // 更新文件状态
+        fileApp.SetFileStatus(m_fileNo, FileAppData::FILE_STATUS_PAUSE);
+        // 暂停所有等待中的文件
         fileApp.PauseAllWaitingFile();
-		break;
-	}
-	case EV_SER_CLT_POST_FILE_ACK:
-	{
+        break;
+    }
+    case EV_SER_CLT_POST_FILE_ACK:
+    {
         if (fileApp.GetFileStatus(m_fileNo) != FileAppData::FILE_STATUS_SEND)  // 文件已暂停发送，不再发送下一条数据包
         {
             OspPrintf(TRUE, FALSE, "[%s]: file paused, stop sending data\n", __FUNCTION__);
             break;
         }
+
+
         // 通知UI进度
-        ui_clt_post_file_progress_ntf msg;
-        msg.fileNo = m_fileNo;
-        msg.progress = m_progress / m_size;
-        CallBackFunc(EV_CLT_UI_POST_FILE_PROGRESS_NTF, &msg, sizeof(msg));
+        if (((u64)m_progress * 100 - BUFFER_SIZE * 100) / m_size != ((u64)m_progress * 100 / m_size))
+        {
+            ui_clt_post_file_progress_ntf msg;
+            msg.fileNo = m_fileNo;
+            msg.progress = (u64)m_progress * 100 / m_size;
+            OspPrintf(TRUE, FALSE, "[%s]: ***** progress: %d\n", __FUNCTION__, msg.progress);
+            CallBackFunc(EV_CLT_UI_POST_FILE_PROGRESS_NTF, &msg, sizeof(msg));
+        }
         // 继续发送下一条数据包
         SendFileContent();
         break;
-	}
-	case EV_SER_CLT_FILE_MD5_ACK:
-	{
-		// 结束发送任务
-		FinishTask();
-		// 继续分配下一个任务
-		AssignTask(m_instId);
-		break;
-	}
-	case EV_SER_CLT_FILE_MD5_NACK:
-	{
+    }
+    case EV_SER_CLT_FILE_MD5_ACK:
+    {
+        // 结束发送任务
+        FinishTask();
+        // 继续分配下一个任务
+        AssignTask(m_instId);
+        break;
+    }
+    case EV_SER_CLT_FILE_MD5_NACK:
+    {
         // 通知UI文件发送失败
         clt_ui_resend_file_ntf msg;
         msg.fileNo = m_fileNo;
         CallBackFunc(EV_CLT_UI_RESEND_FILE_NTF, &msg, sizeof(msg));
         // 重新发送文件
-		ResendFile();
-		break;
-	}
-	case EV_SER_CLT_PAUSE_FILE_ACK:
-	{
+        ResendFile();
+        break;
+    }
+    case EV_SER_CLT_PAUSE_FILE_ACK:
+    {
         OspPrintf(TRUE, FALSE, "[%s]: receive pause_file_ack, pause file\n", __FUNCTION__);
         // 清除数据
         ClearData();
         // 继续分配下一个任务
         AssignTask(m_instId);
         break;
-	}
-	case EV_SER_CLT_CONTINUE_POST_FILE_ACK:
-	{
-		// 根据server回复的进度，确定下一个数据包的位置，继续发送
+    }
+    case EV_SER_CLT_CONTINUE_POST_FILE_ACK:
+    {
+        // 根据server回复的进度，确定下一个数据包的位置，继续发送
         ser_clt_continue_post_file_ack* msg = (ser_clt_continue_post_file_ack*)(pMsg->content);
         m_serverInsId = msg->InstanceNo;
         m_progress = msg->progress;
@@ -384,18 +397,31 @@ void FileAppInstance::InstanceEntry(CMessage *const pMsg)
         OspPrintf(TRUE, FALSE, "[%s]: server progress is %d,continue send file content\n", __FUNCTION__, m_progress);
         SendFileContent();
         break;
-	}
-	case EV_SER_CLT_CANCEL_FILE_ACK:
-	{
-		// 从队列中删除文件，并尝试分配下一个文件发送任务
+    }
+    case EV_SER_CLT_CONTINUE_POST_FILE_NACK:
+    {
+        OspPrintf(TRUE, FALSE, "[%s]: insufficient server resources,pause all file\n", __FUNCTION__);
+        // 通知UI服务端资源不足
+        clt_ui_post_file_fail_ntf msg;
+        msg.fileNo = m_fileNo;
+        CallBackFunc(EV_CLT_UI_POST_FILE_FAIL_NTF, &msg, sizeof(msg));
+        // 更新文件状态
+        fileApp.SetFileStatus(m_fileNo, FileAppData::FILE_STATUS_PAUSE);
+        // 暂停所有等待中的文件
+        fileApp.PauseAllWaitingFile();
+        break;
+    }
+    case EV_SER_CLT_CANCEL_FILE_ACK:
+    {
+        // 从队列中删除文件，并尝试分配下一个文件发送任务
         fileApp.RemoveFile(m_fileNo);
         ClearData();
         AssignTask(m_instId);
         break;
-	}
-	default:
-		break;
-	}
+    }
+    default:
+        break;
+    }
 }
 
 void FileAppInstance::StartSendFile(u32 fileNo)
@@ -418,15 +444,15 @@ void FileAppInstance::StartSendFile(u32 fileNo)
         return;
     }
 
-	// 打开文件流
-	m_file.open(m_fileNameFullPath.c_str(), std::ios::in | std::ios::binary);
-	if (!m_file.is_open())
-	{
-		OspPrintf(TRUE, FALSE, "[%s]: error:cannot open file \"%d\"\n", __FUNCTION__, fileNo);
-		return;
-	}
+    // 打开文件流
+    m_file.open(m_fileNameFullPath.c_str(), std::ios::in | std::ios::binary);
+    if (!m_file.is_open())
+    {
+        OspPrintf(TRUE, FALSE, "[%s]: error:cannot open file \"%d\"\n", __FUNCTION__, fileNo);
+        return;
+    }
 
-	NEXTSTATE(INSTANCE_STATUS_POST_FILE);
+    NEXTSTATE(INSTANCE_STATUS_POST_FILE);
     if (0 == m_progress)
     {
         // 向服务端请求开始发送文件
@@ -457,7 +483,7 @@ void FileAppInstance::ContinueSendFile(u32 fileNo)
     {
         m_fileNo = fileNo;
         m_fileNameFullPath = fileInfo.name;
-        m_fileName = m_fileNameFullPath.substr(m_fileNameFullPath.find_last_of('/')+1);
+        m_fileName = m_fileNameFullPath.substr(m_fileNameFullPath.find_last_of('/') + 1);
         m_progress = fileInfo.progress;
         m_size = fileInfo.size;
     }
@@ -479,7 +505,7 @@ void FileAppInstance::ContinueSendFile(u32 fileNo)
     // 向服务端请求继续发送文件
     clt_ser_continue_post_file_req msg;
     strcpy(msg.fileName, m_fileName.c_str());
-    OspPrintf(TRUE, FALSE, "[%s]: send continue-post-file REQ,fileName:%s\n", __FUNCTION__, msg.fileName); 
+    OspPrintf(TRUE, FALSE, "[%s]: send continue-post-file REQ,fileName:%s\n", __FUNCTION__, msg.fileName);
     post(MAKEIID(FILE_APP_ID_SERVER, CInstance::DAEMON), EV_CLT_SER_CONTINUE_POST_FILE_REQ, &msg, sizeof(msg), serverNode);
     // 更新文件状态
     fileApp.SetFileStatus(fileNo, FileAppData::FILE_STATUS_SEND);
@@ -503,22 +529,22 @@ void FileAppInstance::SendFileContent()
         return;
     }
 
-	clt_ser_post_file_ntf msg;
-	m_file.read(msg.fileContent, sizeof(msg.fileContent));  // 读取文件内容
-	if (m_file.eof())   // 已经读到文件尾，发送最后一个数据包
-	{
-		msg.length = m_file.gcount();
-		m_progress += msg.length;
+    clt_ser_post_file_ntf msg;
+    m_file.read(msg.fileContent, sizeof(msg.fileContent));  // 读取文件内容
+    if (m_file.eof())   // 已经读到文件尾，发送最后一个数据包
+    {
+        msg.length = m_file.gcount();
+        m_progress += msg.length;
         OspPrintf(TRUE, FALSE, "[%s]: send ths last content,length of content:%d\n", __FUNCTION__, m_fileName.c_str(), m_progress, msg.length);
-		post(MAKEIID(FILE_APP_ID_SERVER, m_serverInsId), EV_CLT_SER_POST_FILE_REQ, &msg, sizeof(msg), serverNode);
-	}
-	else  // 发送文件内容
-	{
-		OspPrintf(TRUE, FALSE, "[%s]: send file content, data length: %d\n", __FUNCTION__, BUFFER_SIZE);
-		msg.length = BUFFER_SIZE;
-		m_progress += msg.length;
-		post(MAKEIID(FILE_APP_ID_SERVER, m_serverInsId), EV_CLT_SER_POST_FILE_REQ, &msg, sizeof(msg), serverNode);
-	}
+        post(MAKEIID(FILE_APP_ID_SERVER, m_serverInsId), EV_CLT_SER_POST_FILE_REQ, &msg, sizeof(msg), serverNode);
+    }
+    else  // 发送文件内容
+    {
+        OspPrintf(TRUE, FALSE, "[%s]: send file content, data length: %d\n", __FUNCTION__, BUFFER_SIZE);
+        msg.length = BUFFER_SIZE;
+        m_progress += msg.length;
+        post(MAKEIID(FILE_APP_ID_SERVER, m_serverInsId), EV_CLT_SER_POST_FILE_REQ, &msg, sizeof(msg), serverNode);
+    }
 }
 
 void FileAppInstance::PauseFile()
@@ -536,15 +562,15 @@ void FileAppInstance::CancelFile()
     fileApp.SetFileProgress(m_fileNo, m_progress);
 
     OspPrintf(TRUE, FALSE, "[%s]: send cancel_file_req to server\n", __FUNCTION__, m_instId, m_fileNo);
-    post(MAKEIID(FILE_APP_ID_SERVER, m_serverInsId), EV_CLT_SER_CANCEL_FILE_REQ,NULL, 0, serverNode);
+    post(MAKEIID(FILE_APP_ID_SERVER, m_serverInsId), EV_CLT_SER_CANCEL_FILE_REQ, NULL, 0, serverNode);
 }
 
 void FileAppInstance::ResendFile()
 {
-	OspPrintf(TRUE, FALSE, "[%s]: called，cleaar progress, send first content\n", __FUNCTION__);
+    OspPrintf(TRUE, FALSE, "[%s]: called，cleaar progress, send first content\n", __FUNCTION__);
 
-	// 重新发送第一条数据包
-	m_progress = 0;
+    // 重新发送第一条数据包
+    m_progress = 0;
     if (m_file.is_open())
     {
         m_file.seekg(0);
@@ -553,20 +579,20 @@ void FileAppInstance::ResendFile()
     {
         m_file.open(m_fileNameFullPath.c_str(), std::ios::in | std::ios::binary);
     }
-	SendFileContent();
+    SendFileContent();
 }
 
 void FileAppInstance::FinishTask()
 {
-	OspPrintf(TRUE, FALSE, "[%s]: called,clear data\n", __FUNCTION__);
+    OspPrintf(TRUE, FALSE, "[%s]: called,clear data\n", __FUNCTION__);
 
-	// 通知UI文件发送完成
-	clt_ui_post_file_complete_ntf msg;
-	msg.fileNo = m_fileNo;
-	CallBackFunc(EV_CLT_UI_POST_FILE_COMPLETE_NTF, &msg, sizeof(msg));
+    // 通知UI文件发送完成
+    clt_ui_post_file_complete_ntf msg;
+    msg.fileNo = m_fileNo;
+    CallBackFunc(EV_CLT_UI_POST_FILE_COMPLETE_NTF, &msg, sizeof(msg));
 
-	// 从文件队列中移除发送任务
-	fileApp.RemoveFile(m_fileNo);
+    // 从文件队列中移除发送任务
+    fileApp.RemoveFile(m_fileNo);
 
     ClearData();
 }

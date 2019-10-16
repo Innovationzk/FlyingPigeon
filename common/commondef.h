@@ -12,7 +12,7 @@ typedef struct {
 #define EV_SER_CLT_START_POST_FILE_ACK           (u16)2       // 服务端确认开始接收文件
 typedef struct {
 	u8 InstanceNo;                  // 分配的Instance号
-}er_clt_start_post_file_ack;
+}ser_clt_start_post_file_ack;
 #define EV_SER_CLT_START_POST_FILE_NACK          (u16)3       // 服务端资源不足
 
 #define EV_CLT_SER_POST_FILE_REQ                 (u16)4       // 客户端发送文件给服务端
@@ -24,8 +24,8 @@ typedef struct {
 
 #define EV_CLT_SER_FILE_MD5_REQ                  (u16)6       // 客户端文件传输完毕，发送md5校验码
 typedef struct {
-	s8 md5[32];                     // 文件md5校验码
-}clt_ser_file_end_ntf;
+	s8 md5[33];                     // 文件md5校验码
+}clt_ser_file_md5_req;
 
 #define EV_SER_CLT_FILE_MD5_ACK                  (u16)7       // 服务端文件校验完成
 #define EV_SER_CLT_FILE_MD5_NACK                 (u16)8       // 服务端文件校验失败
@@ -109,10 +109,7 @@ typedef struct {
 	s8 fileName[BUFFER_SIZE];       // 文件名
 }ui_clt_post_file_req;
 #define EV_CLT_UI_POST_FILE_ACK                  (u16)27      // 底层确认发送文件
-typedef struct {
-    u32 fileNo;                     // 文件编号（这批文件中第一个文件的编号，作为每个文件的唯一标识）
-}clt_ui_post_file_ack;
-#define EV_CLT_UI_POST_FILE_NACK                 (u16)28      // 底层拒绝发送文件
+#define EV_CLT_UI_POST_FILE_NACK                 (u16)28      // 服务器离线，底层拒绝发送文件
 
 #define EV_CLT_UI_POST_FILE_PROGRESS_NTF         (u16)29      // 底层通知UI文件进度
 typedef struct {
@@ -120,11 +117,14 @@ typedef struct {
 	u32 progress;                   // 文件进度
 }ui_clt_post_file_progress_ntf;
 #define EV_CLT_UI_POST_FILE_FAIL_NTF             (u16)30      // 底层通知UI服务端资源不足
+typedef struct {
+    u32 fileNo;                     // 文件编号
+}clt_ui_post_file_fail_ntf;
 
 #define EV_CLT_UI_RESEND_FILE_NTF                (u16)31      // 底层通知UI校验失败，重新发送文件
 typedef struct {
 	u32 fileNo;                     // 文件编号
-}clt_ui_file_md5_ntf;
+}clt_ui_resend_file_ntf;
 #define EV_CLT_UI_POST_FILE_COMPLETE_NTF         (u16)32      // 底层通知UI文件发送成功
 typedef struct {
 	u32 fileNo;                     // 文件编号
@@ -153,14 +153,14 @@ typedef struct {
 #define EV_UI_CLT_REGIST_REQ                     (u16)39      // UI通知底层注册用户名
 typedef struct {
 	s8 userName[BUFFER_SIZE];       // 用户名
-}ui_clt_regist_cmd;
+}ui_clt_regist_req;
 #define EV_CLT_UI_REGIST_ACK                     (u16)40      // 底层确认注册
 #define EV_CLT_UI_REGIST_NACK                    (u16)41      // 底层拒绝注册
 
 #define EV_UI_CLT_LOG_IN_REQ                     (u16)42      // UI通知底层登录
 typedef struct {
     s8 userName[BUFFER_SIZE];       // 用户名
-}ui_clt_log_in_cmd;
+}ui_clt_log_in_req;
 #define EV_CLT_UI_LOG_IN_ACK                     (u16)43      // 底层确认登录
 #define EV_CLT_UI_LOG_IN_NACK                    (u16)44      // 底层拒绝登录
 
@@ -171,23 +171,32 @@ typedef struct {
 #define EV_CLT_UI_REGIST_LIST_NTF                (u16)46      // 底层通知UI在线列表
 typedef struct {
     s32 clientNum;                  // 客户端数量
-    u32 clientNode[100];            // 客户端编号
+    u32 clientNo[100];              // 客户端编号
     s8 clientName[BUFFER_SIZE];     // 客户端用户名
 }clt_ui_regist_list_ntf;
 
 // 发送消息
 #define EV_UI_CLT_POST_MSG_REQ                   (u16)47      // UI请求发送消息
 typedef struct {
-	u8 clientNum;                   // 目标客户端数量
+	u16 clientNum;                  // 目标客户端数量
     u32 clientNo[16];               // 目标客户端编号
 	s8 msgContent[BUFFER_SIZE];     // 消息内容
 }ui_clt_post_msg_req;
 #define EV_CLT_UI_POST_MSG_ACK                   (u16)48      // 底层确认发送消息
 #define EV_CLT_UI_POST_MSG_NACK                  (u16)49      // 底层拒绝发送消息
 
+#define EV_CLT_UI_RECEIVE_MSG_NTF                (u16)50      // 底层通知UI收到消息
+typedef struct {
+    u32 srcClientNo;                // 源客户端编号
+    s8 msgContent[BUFFER_SIZE];     // 消息内容
+}clt_ui_receive_msg_ntf;
+
+#define EV_CLT_UI_DISC_NTF                       (u16)51      // 底层通知UI连接断开
+
 /***************************连接断开与定时重连***************************/
-#define EV_CLT_CLT_RECONNECT_NTF                 (u16)50      // 断开时超时重新连接
-#define EV_CLT_CLT_CONNECT_SUCCEED_NTF           (u16)51      // 连接成功
+#define EV_CLT_CLT_RECONNECT_NTF                 (u16)52      // 断开时超时重新连接
+#define EV_CLT_CLT_CONNECT_SUCCEED_NTF           (u16)53      // 连接成功
+
 
 
 // 断开时重连间隔
@@ -244,4 +253,4 @@ typedef struct {
 #define MSG_APP_QUEUE_SIZE_SERVER                1000
 
 // 服务端IP地址
-#define IPV4_ADDRESS_SERVER                      ((u32)inet_addr( "192.168.1.104" ))
+#define IPV4_ADDRESS_SERVER                      ((u32)inet_addr( "192.168.126.128" ))

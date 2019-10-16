@@ -2,13 +2,13 @@
 #include <msgappdata.h>
 #include <commondef.h>
 
-/****************TODO:正式发布版需要修改*****************
-#ifdef _DEBUG*/
+/****************TODO:正式发布版需要修改******************
+#ifdef _DEBUG
 #define OspPrintf(TRUE, FALSE, ...) printf(__VA_ARGS__)
-/*#else
+#else
 #define OspPrintf(a, b, ...)
 #endif
-/********************************************************/
+********************************************************/
 
 extern int serverNode;
 extern zTemplate<MsgAppInstance, MSG_APP_INSTANCE_NUMBER_CLIENT, MsgAppData, MAX_ALIAS_LENGTH_CLIENT> msgApp;
@@ -121,6 +121,8 @@ void MsgAppInstance::DaemonInstanceEntry(CMessage* const pMsg, CApp* pCApp)
         // 收到其他客户端的消息
         ser_clt_post_msg_ntf* msg = (ser_clt_post_msg_ntf*)(pMsg->content);
         OspPrintf(TRUE, FALSE, "[%s]: receive msg,srcClientNo:%d,msgContent:%s\n", __FUNCTION__, msg->srcClientNo, msg->msgContent);
+        // 通知UI
+        CallBackFunc(EV_CLT_UI_RECEIVE_MSG_NTF, pMsg->content, pMsg->length);
         break;
     }
     case EV_CLT_CLT_RECONNECT_NTF:
@@ -131,7 +133,9 @@ void MsgAppInstance::DaemonInstanceEntry(CMessage* const pMsg, CApp* pCApp)
     }
     case OSP_DISCONNECT:
     {
-        // 收到断开通知，定时重连
+        // 收到断开通知,通知UI
+        CallBackFunc(EV_CLT_UI_DISC_NTF, NULL, 0);
+        // 定时重连
         OspPrintf(TRUE, FALSE, "[%s]: server node discconnect,will reconnect after %dms\n", __FUNCTION__, RECONNECT_INTERVAL);
         serverNode = INVALID_NODE;
         SetTimer(EV_CLT_CLT_RECONNECT_NTF, RECONNECT_INTERVAL);
@@ -204,8 +208,10 @@ void MsgAppInstance::SendMsg(CMessage* const pMsg)
     if (TRUE == OspIsValidTcpNode(serverNode))  // 服务器在线，发送消息
     {
         OspPrintf(TRUE, FALSE, "[%s]: send msg to server\n", __FUNCTION__);
-        post(MAKEIID(MSG_APP_ID_SERVER, CInstance::DAEMON), EV_CLT_SER_POST_MSG_NTF, pMsg->content, pMsg->length, serverNode);
+        clt_ser_post_msg_ntf* srcMsg = (clt_ser_post_msg_ntf*)(pMsg->content);
+        OspPrintf(TRUE, FALSE, "[%s]: target clients number is:%d,msg content is:%s\n", __FUNCTION__, srcMsg->clientNum, srcMsg->msgContent);
         CallBackFunc(EV_CLT_UI_POST_MSG_ACK, NULL, 0);
+        post(MAKEIID(MSG_APP_ID_SERVER, CInstance::DAEMON), EV_CLT_SER_POST_MSG_NTF, pMsg->content, pMsg->length,serverNode);
     }
     else  // 服务器离线，拒绝发送
     {

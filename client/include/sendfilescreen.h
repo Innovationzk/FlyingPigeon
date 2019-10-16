@@ -4,6 +4,8 @@
 #include <QWidget>
 #include <QString>
 #include "commondef.h"
+#include "json/json.h"
+#include "filelistitem.h"
 
 class QLabel;
 class QPushButton;
@@ -20,10 +22,13 @@ public:
     void paintEvent(QPaintEvent *event);
     void closeEvent(QCloseEvent *event);
     void addFile(const QString &filePath);
+    void restoreExistFileList();
+    void addExistFile(const QString &filePath,u32 fileNo,FileListItem::FILE_STATUS fileStatus);
 
     static unsigned int sm_fileNo;
 
 signals:
+    //void sigCloseEvent();
 
 public slots:
     // 添加新文件
@@ -38,6 +43,12 @@ public slots:
     void onNotifySendFileResult(u16 eventType);
     // 进度更新
     void onNotifyFileProgress(u32 fileNo, u32 progress);
+    // 服务器资源不足
+    void onNotifySendFileFalied(u32 fileNo);
+    // 文件发送完毕
+    void onNotifyPostFileComplete(u32 fileNo);
+    // 文件校验失败
+    void onNotifyResendFile(u32 fileNo);
 
 private:
     QLabel *m_labIcon;             // 图标
@@ -48,7 +59,8 @@ private:
     QPushButton *m_btnSendFile;    // 文件发送按钮
     QListWidget *m_fileList;       // 文件列表
     QSet<QString> m_setAllFile;    // 所有文件
-    QMap<unsigned int,QListWidgetItem*> m_mapSendingList;   // 正在发送中的文件
+    QMap<unsigned int,FileListItem*> m_mapSendingList;         // 正在发送中的文件
+    QMap<unsigned int,QListWidgetItem*> m_mapListWidgetItem;   // QListWidgetItem索引
 };
 
 

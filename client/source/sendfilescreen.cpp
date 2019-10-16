@@ -1,15 +1,18 @@
 ﻿#include <QLabel>
 #include <QDebug>
+#include <QFile>
 #include <QPainter>
 #include <QFileDialog>
 #include <QCloseEvent>
 #include <QPushButton>
 #include <QListWidget>
+#include <QStringList>
 #include <QListWidgetItem>
 #include <QGridLayout>
 #include <QHBoxLayout>
 #include <QMessageBox>
 #include <QStringList>
+#include <string>
 #include "sendfilescreen.h"
 #include "filelistitem.h"
 #include "uicontroller.h"
@@ -93,8 +96,11 @@ SendFileScreen::SendFileScreen(QString userName)
     connect(m_btnPauseAll,SIGNAL(clicked(bool)),this,SLOT(onBtnPauseAllClicked()));
     connect(m_btnContinueAll,SIGNAL(clicked(bool)),this,SLOT(onBtnContinueAllClicked()));
     UIController* uiController = UIController::getInstance();
+    qRegisterMetaType<u32>("u32");
     connect(uiController, SIGNAL(sigSendFileResult(u16)), this, SLOT(onNotifySendFileResult(u16)));
     connect(uiController, SIGNAL(sigNotifyFileProgress(u32, u32)), this, SLOT(onNotifyFileProgress(u32, u32)));
+    connect(uiController, SIGNAL(sigNotifySendFileFalied(u32)), this, SLOT(onNotifySendFileFalied(u32)));
+    connect(uiController, SIGNAL(sigPostFileComplete(u32)), this, SLOT(onNotifyPostFileComplete(u32)));
 }
 
 void SendFileScreen::paintEvent(QPaintEvent *event)
@@ -109,7 +115,8 @@ void SendFileScreen::closeEvent(QCloseEvent *event)
     // 如果发送列表中有未完成的文件
     if (m_mapSendingList.isEmpty())
     {
-        event->accept();
+        this->hide();
+        event->ignore();
         return;
     }
 
@@ -124,13 +131,14 @@ void SendFileScreen::closeEvent(QCloseEvent *event)
     }
     else if (button == QMessageBox::Yes)  //接受退出信号，程序退出
     {
-        for (QMap<unsigned int,QListWidgetItem*>::iterator it = m_mapSendingList.begin();it != m_mapSendingList.end();)
+        for (QMap<unsigned int,FileListItem*>::iterator it = m_mapSendingList.begin();it != m_mapSendingList.end();)
         {
-            FileListItem *fileListItem = (FileListItem *)(m_fileList->itemWidget(it.value()));
+            FileListItem *fileListItem = it.value();
             ++it;    // 防止迭代器失效
             fileListItem->cancelSendFile();
         }
-        event->accept();
+        this->hide();
+        event->ignore();
     }
 }
 
@@ -143,8 +151,57 @@ void SendFileScreen::addFile(const QString &filePath)
     m_fileList->setItemWidget(listWidgetItem,fileListItem);
 
     // 添加到正在发送列表
-    m_mapSendingList[sm_fileNo]=listWidgetItem;
+    m_mapSendingList[sm_fileNo]=fileListItem;
+    m_mapListWidgetItem[sm_fileNo]=listWidgetItem;
     ++sm_fileNo;
+
+    // 开始发送
+    fileListItem->startSendFile();
+
+    // 绑定信号
+    connect(fileListItem,SIGNAL(sigRemoveItem(unsigned int)),this,SLOT(onNotifyRemoveItem(unsigned int)));
+}
+
+void SendFileScreen::restoreExistFileList()
+{
+    // 读取本地备份列表
+    QDir directory("fileList");
+    QStringList strFileList = directory.entryList(QStringList(),QDir::Files);
+    for (int i = 0;i<strFileList.size();++i)
+    {
+        qDebug("[%s]: open file %s\n",__FUNCTION__,strFileList[i].toLocal8Bit().data());
+        QFile file("fileList/"+strFileList[i]);
+        file.open(QIODevice::ReadOnly);
+        if (file.isOpen())
+        {
+            QString fileFullPath = file.readLine();
+            fileFullPath.remove(fileFullPath.size()-1,1);
+            qDebug()<<fileFullPath;
+            FileListItem::FILE_STATUS state = (FileListItem::FILE_STATUS)(file.readLine().toInt());
+            qDebug("[%s]: fileFullPath:%s,state:%d\n",__FUNCTION__,fileFullPath.toLocal8Bit().data(),state);
+            addExistFile(fileFullPath,strFileList[i].toInt(),state);
+            if (state != FileListItem::FILE_STATUS_COMPLETE)
+            {
+                this->show();
+            }
+        }
+    }
+}
+
+void SendFileScreen::addExistFile(const QString &filePath, u32 fileNo, FileListItem::FILE_STATUS fileStatus)
+{
+    FileListItem *fileListItem = new FileListItem(filePath,fileNo);
+    QListWidgetItem *listWidgetItem = new QListWidgetItem(m_fileList);
+    listWidgetItem->setSizeHint(QSize(m_fileList->width()-20,fileListItem->height()));
+    m_fileList->setItemWidget(listWidgetItem,fileListItem);
+
+    fileListItem->setStatus(fileStatus);
+    // 添加到正在发送列表
+    if (fileStatus!=FileListItem::FILE_STATUS_COMPLETE)
+    {
+        m_mapSendingList[fileNo]=fileListItem;
+        m_mapListWidgetItem[fileNo]=listWidgetItem;
+    }
 
     // 绑定信号
     connect(fileListItem,SIGNAL(sigRemoveItem(unsigned int)),this,SLOT(onNotifyRemoveItem(unsigned int)));
@@ -173,34 +230,36 @@ void SendFileScreen::onNotifyRemoveItem(unsigned int fileNo)
 
     if (m_mapSendingList.find(fileNo)==m_mapSendingList.end())
     {
-        printf("[%s]: error:cannot find file:%d\n",__FUNCTION__,fileNo);
+        qDebug("[%s]: error:cannot find file:%d\n",__FUNCTION__,fileNo);
         return;
     }
-    QListWidgetItem *listWidgetItem = m_mapSendingList[fileNo];
-    m_mapSendingList.remove(fileNo);
-    FileListItem *fileListItem = (FileListItem *)(m_fileList->itemWidget(listWidgetItem));
+    FileListItem *fileListItem = m_mapSendingList[fileNo];
+    QListWidgetItem *listWidgetItem = m_mapListWidgetItem[fileNo];
 
+    qDebug("[%s]: disconnect signal and delete fileListItem\n",__FUNCTION__);
     // 解绑信号
     disconnect(fileListItem,SIGNAL(sigRemoveItem(unsigned int)),this,SLOT(onNotifyRemoveItem(unsigned int)));
     // 释放内存
+    m_mapSendingList.remove(fileNo);
+    m_setAllFile.remove(fileListItem->getFileFullPath());
     delete m_fileList->takeItem(m_fileList->row(listWidgetItem));
-    delete fileListItem;
+    //delete fileListItem;
 }
 
 void SendFileScreen::onBtnPauseAllClicked()
 {
-    for (QMap<unsigned int,QListWidgetItem*>::iterator it = m_mapSendingList.begin();it != m_mapSendingList.end();++it)
+    for (QMap<unsigned int,FileListItem*>::iterator it = m_mapSendingList.begin();it != m_mapSendingList.end();++it)
     {
-        FileListItem *fileListItem = (FileListItem *)(m_fileList->itemWidget(it.value()));
+        FileListItem *fileListItem = it.value();
         fileListItem->pauseFile();
     }
 }
 
 void SendFileScreen::onBtnContinueAllClicked()
 {
-    for (QMap<unsigned int,QListWidgetItem*>::iterator it = m_mapSendingList.begin();it != m_mapSendingList.end();++it)
+    for (QMap<unsigned int,FileListItem*>::iterator it = m_mapSendingList.begin();it != m_mapSendingList.end();++it)
     {
-        FileListItem *fileListItem = (FileListItem *)(m_fileList->itemWidget(it.value()));
+        FileListItem *fileListItem = it.value();
         fileListItem->continueFile();
     }
 }
@@ -227,12 +286,52 @@ void SendFileScreen::onNotifySendFileResult(u16 eventType)
 
 void SendFileScreen::onNotifyFileProgress(u32 fileNo, u32 progress)
 {
-    if (m_mapSendingList.find(fileNo) == m_mapSendingList.end())
+    if (m_mapSendingList.find(fileNo)==m_mapSendingList.end())
     {
-        qDebug("[%s]: error: file %d does not exist\n", __FUNCTION__, fileNo);
+        return;
     }
-    FileListItem* fileListItem = (FileListItem*)(m_fileList->itemWidget(m_mapSendingList[fileNo]));
-    fileListItem->setProgress(progress);
+    qDebug("[%s]: called, fileNo:%d, progress:%d\n", __FUNCTION__, fileNo, progress);
+    m_mapSendingList[fileNo]->setProgress(progress);
+}
+
+void SendFileScreen::onNotifySendFileFalied(u32 fileNo)
+{
+    qDebug("[%s]: called\n", __FUNCTION__);
+
+    QMessageBox::information(this,QString::fromLocal8Bit("提示"),QString::fromLocal8Bit("服务器资源不足，将暂停等待中的文件"));
+
+    for (QMap<unsigned int,FileListItem*>::iterator it = m_mapSendingList.begin();it != m_mapSendingList.end();++it)
+    {
+        FileListItem *fileListItem = m_mapSendingList[fileNo];
+        if(fileListItem->isWaiting())
+        {
+            fileListItem->pauseFile();
+        }
+    }
+}
+
+void SendFileScreen::onNotifyPostFileComplete(u32 fileNo)
+{
+    qDebug("[%s]: called,file %d complete\n", __FUNCTION__, fileNo);
+
+    if (m_mapSendingList.find(fileNo)==m_mapSendingList.end())
+    {
+        qDebug("[%s]: error:file %d not in file sending task\n", __FUNCTION__, fileNo);
+        return;
+    }
+    FileListItem *fileListItem = m_mapSendingList[fileNo];
+    m_mapSendingList.remove(fileNo);
+    m_mapListWidgetItem.remove(fileNo);
+    fileListItem->sendFileComplete();
+}
+
+void SendFileScreen::onNotifyResendFile(u32 fileNo)
+{
+    qDebug("[%s]: called, fileNo %d\n", __FUNCTION__, fileNo);
+
+    FileListItem *fileListItem = m_mapSendingList[fileNo];
+    fileListItem->setProgress(0);
+    QMessageBox::information(this,QString::fromLocal8Bit("提示"),fileListItem->getFileName()+QString::fromLocal8Bit("校验失败，需要重新发送"));
 }
 
 

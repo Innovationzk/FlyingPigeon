@@ -5,7 +5,7 @@
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
-#elif _LINUX
+#elif _LINUX_
 #include <stdarg.h>
 #include <sys/stat.h>
 #endif
@@ -13,7 +13,7 @@
 #ifdef _WIN32
 #define ACCESS _access
 #define MKDIR(dir) _mkdir((dir))
-#elif _LINUX
+#elif _LINUX_
 #define ACCESS access
 #define MKDIR(dir) mkdir((dir),0755)
 #endif

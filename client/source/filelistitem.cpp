@@ -1,5 +1,6 @@
 ﻿#include <QLabel>
 #include <QDebug>
+#include <QFile>
 #include <QPainter>
 #include <QFileInfo>
 #include <QToolButton>
@@ -16,19 +17,26 @@
 
 FileListItem::FileListItem(const QString& fileFullPath, unsigned int fileNo):
     m_fileNo(fileNo),
+    m_fileFullPath(fileFullPath),
     m_bIsComplete(false)
 {
+    qDebug("[%s]: fileFullPath:%s\n",__FUNCTION__,fileFullPath.toLocal8Bit().data());
     // 文件图标
     m_labIcon = new QLabel(this);
     QFileInfo info(fileFullPath);
     QFileIconProvider ip;
     QIcon icon=ip.icon(info);
+    if (icon.isNull())
+    {
+        qDebug()<<"icon.isNull()";
+    }
     m_labIcon->setPixmap(icon.pixmap(25,25));
-    m_labIcon->move(10,20);
+    m_labIcon->move(10,10);
 
     // 文件名
     m_labName=new QLabel(this);
-    m_labName->setText(QFileInfo(fileFullPath).fileName());
+    m_fileName=QFileInfo(fileFullPath).fileName();
+    m_labName->setText(m_fileName);
     m_labName->setStyleSheet("QLabel{color: rgb(45, 45, 45);"
                              "font-family:Microsoft YaHei UI;font: 9pt;}");
     m_labName->move(65,10);
@@ -37,7 +45,6 @@ FileListItem::FileListItem(const QString& fileFullPath, unsigned int fileNo):
     m_progressBar = new QProgressBar(this);
     m_progressBar->move(65,30);
     m_progressBar->setValue(0);
-    m_progressBar->setFormat(QString::fromLocal8Bit("等待中..."));
 
     // 按钮
     m_btnContinue = new QToolButton(this);
@@ -87,11 +94,19 @@ FileListItem::FileListItem(const QString& fileFullPath, unsigned int fileNo):
     connect(m_btnPause,SIGNAL(clicked(bool)),this,SLOT(onBtnPauseClicked()));
     connect(m_btnCancel,SIGNAL(clicked(bool)),this,SLOT(onBtnCancelClicked()));
 
-    // 通知底层开始发送文件
-    ui_clt_post_file_req msg;
-    msg.fileNum = 1;
-    strcpy(msg.fileName, fileFullPath.toUtf8().data());
-    CLIENTAPP::Post(EV_UI_CLT_POST_FILE_REQ, &msg, sizeof(msg));
+    // 保存备份文件
+    m_backUpFile.setFileName(QString("fileList/")+QString::number(m_fileNo));
+    m_backUpFile.open(QIODevice::WriteOnly);
+    if (m_backUpFile.isOpen())
+    {
+        m_backUpFile.write((m_fileFullPath+"\n"+QString::number(FILE_STATUS_WAIT)).toUtf8());
+        m_backUpFile.close();
+    }
+}
+
+FileListItem::~FileListItem()
+{
+    qDebug()<<"in destrustor";
 }
 
 void FileListItem::paintEvent(QPaintEvent *)
@@ -103,8 +118,8 @@ void FileListItem::paintEvent(QPaintEvent *)
 
 void FileListItem::setProgress(int progress)
 {
+    qDebug("[%s]: called\n", __FUNCTION__);
     m_progress=progress;
-    m_progressBar->resetFormat();
     m_progressBar->setValue(progress);
     if (progress == 100)  // 发送完成，校验中
     {
@@ -112,9 +127,44 @@ void FileListItem::setProgress(int progress)
     }
 }
 
+void FileListItem::setStatus(FileListItem::FILE_STATUS state)
+{
+    if (state==FILE_STATUS_WAIT)
+    {
+        m_bIsComplete = false;
+        m_btnContinue->hide();
+        m_btnPause->show();
+    }
+    else if (state==FILE_STATUS_PAUSE)
+    {
+        m_bIsComplete = false;
+        //m_progressBar->setFormat(QString::fromLocal8Bit("%p% 暂停中"));
+        m_btnContinue->show();
+        m_btnPause->hide();
+    }
+    else if (state==FILE_STATUS_COMPLETE)
+    {
+        m_bIsComplete = true;
+        m_progressBar->setMaximum(100);
+        m_progressBar->setValue(100);
+        m_progressBar->setFormat(QString::fromLocal8Bit("已完成"));
+        m_btnContinue->hide();
+        m_btnPause->hide();
+        m_btnCancel->hide();
+        m_labComplete->show();
+        m_progressBar->setProperty("type","complete");
+        m_progressBar->setStyleSheet(m_progressBar->styleSheet());
+    }
+}
+
 void FileListItem::cancelSendFile()
 {
-    // TODO
+    qDebug("[%s]: called\n",__FUNCTION__);
+    ui_clt_cancel_file_cmd msg;
+    msg.fileNo = m_fileNo;
+    CLIENTAPP::Post(EV_UI_CLT_CANCEL_FILE_CMD,&msg, sizeof(msg));
+    // 删除备份文件
+    m_backUpFile.remove();
     emit sigRemoveItem(m_fileNo);
 }
 
@@ -126,17 +176,34 @@ void FileListItem::pauseFile()
 void FileListItem::continueFile()
 {
     onBtnContinueClicked();
+    // 保存备份文件
+    m_backUpFile.open(QIODevice::WriteOnly);
+    if (m_backUpFile.isOpen())
+    {
+        m_backUpFile.write((m_fileFullPath+"\n"+QString::number(FILE_STATUS_WAIT)).toUtf8());
+        m_backUpFile.close();
+    }
 }
 
 void FileListItem::sendFileComplete()
 {
     m_bIsComplete = true;
+    m_progressBar->setMaximum(100);
+    m_progressBar->setValue(100);
     m_progressBar->setFormat(QString::fromLocal8Bit("已完成"));
     m_btnPause->hide();
     m_btnCancel->hide();
     m_labComplete->show();
     m_progressBar->setProperty("type","complete");
     m_progressBar->setStyleSheet(m_progressBar->styleSheet());
+
+    // 保存备份文件
+    m_backUpFile.open(QIODevice::WriteOnly);
+    if (m_backUpFile.isOpen())
+    {
+        m_backUpFile.write((m_fileFullPath+"\n"+QString::number(FILE_STATUS_COMPLETE)).toUtf8());
+        m_backUpFile.close();
+    }
 }
 
 bool FileListItem::isComplete()
@@ -144,22 +211,65 @@ bool FileListItem::isComplete()
     return m_bIsComplete;
 }
 
+bool FileListItem::isWaiting()
+{
+    if (m_progressBar->format() == QString::fromLocal8Bit("%p% 等待发送..."))
+    {
+        return true;
+    }
+    return false;
+}
+
+void FileListItem::startSendFile()
+{
+    // 通知底层开始发送文件
+    ui_clt_post_file_req msg;
+    msg.fileNum = 1;
+    strcpy(msg.fileName, m_fileFullPath.toLocal8Bit().data());
+    CLIENTAPP::Post(EV_UI_CLT_POST_FILE_REQ, &msg, sizeof(msg));
+}
+
 void FileListItem::onBtnContinueClicked()
 {
-    // TODO
+    qDebug("[%s]: called\n",__FUNCTION__);
+
     m_btnContinue->hide();
     m_btnPause->show();
-    m_progressBar->resetFormat();
+    //m_progressBar->setFormat(QString::fromLocal8Bit("%p% 等待发送..."));
     m_progressBar->setValue(m_progress);
+    update();
+
+    ui_clt_continue_file_cmd msg;
+    msg.fileNo = m_fileNo;
+    CLIENTAPP::Post(EV_UI_CLT_CONTINUE_FILE_CMD, &msg, sizeof(msg));
+
+    // 保存备份文件
+    m_backUpFile.open(QIODevice::WriteOnly);
+    if (m_backUpFile.isOpen())
+    {
+        m_backUpFile.write((m_fileFullPath+"\n"+QString::number(FILE_STATUS_WAIT)).toUtf8());
+        m_backUpFile.close();
+    }
 }
 
 void FileListItem::onBtnPauseClicked()
 {
     qDebug("[%s]: called\n",__FUNCTION__);
-    // TODOm_pro
+
     m_btnContinue->show();
     m_btnPause->hide();
-    m_progressBar->setFormat(QString::fromLocal8Bit("暂停中"));
+
+    ui_clt_pause_file_cmd msg;
+    msg.fileNo = m_fileNo;
+    CLIENTAPP::Post(EV_UI_CLT_PAUSE_FILE_CMD, &msg, sizeof(msg));
+
+    // 保存备份文件
+    m_backUpFile.open(QIODevice::WriteOnly);
+    if (m_backUpFile.isOpen())
+    {
+        m_backUpFile.write((m_fileFullPath+"\n"+QString::number(FILE_STATUS_PAUSE)).toUtf8());
+        m_backUpFile.close();
+    }
 }
 
 void FileListItem::onBtnCancelClicked()
@@ -174,7 +284,8 @@ void FileListItem::onBtnCancelClicked()
         // do nothing
     }
     else if (button == QMessageBox::Yes) {
-        qDebug("[%s]: emit signal sigRemoveItem(%d)\n",__FUNCTION__, m_fileNo);
-        emit sigRemoveItem(m_fileNo);
+        cancelSendFile();
     }
+    // 保存备份文件
+    m_backUpFile.remove();
 }

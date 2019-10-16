@@ -5,13 +5,13 @@
 #include <msgappinstance.h>
 #include <commondef.h>
 
-/****************TODO:正式发布版需要修改******************/
+/****************TODO:正式发布版需要修改******************
 #ifdef _DEBUG
 #define OspPrintf(TRUE, FALSE, ...) printf(__VA_ARGS__)
 #else
 #define OspPrintf(a, b, ...)
 #endif
-/********************************************************/
+********************************************************/
 
 zTemplate<FileAppInstance, FILE_APP_INSTANCE_NUMBER_CLIENT, FileAppData, MAX_ALIAS_LENGTH_CLIENT> fileApp;  // 定义fileApp
 zTemplate<MsgAppInstance, MSG_APP_INSTANCE_NUMBER_CLIENT, MsgAppData, MAX_ALIAS_LENGTH_CLIENT> msgApp;      // 定义msgApp

@@ -10,7 +10,7 @@ class MsgListItem : public QWidget
 {
     Q_OBJECT
 public:
-    explicit MsgListItem(const QString& name = "unknown", const QString& msg = "", bool isFriendMsg = false,
+    explicit MsgListItem(const QString& msg = "", bool isFriendMsg = false,
                          QDateTime dateTime = QDateTime::currentDateTime());
 
     int height() const
@@ -26,7 +26,6 @@ private:
     QLabel *m_labIcon;
     QLabel *m_labDateTime;
     QLabel *m_labContent;
-    QString m_friendName;
     int m_height;
 };
 

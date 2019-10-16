@@ -3,7 +3,7 @@
 #ifdef _WIN32
 #include <direct.h>
 #include <io.h>
-#elif _LINUX
+#elif _LINUX_
 #include <stdarg.h>
 #include <sys/stat.h>
 #endif
@@ -16,7 +16,7 @@
 #ifdef _WIN32
 #define ACCESS _access
 #define MKDIR(dir) _mkdir((dir))
-#elif _LINUX
+#elif _LINUX_
 #define ACCESS access
 #define MKDIR(dir) mkdir((dir),0755)
 #endif
@@ -95,7 +95,7 @@ void FileAppInstance::AssignTask(CMessage* const pMsg)
 			OspPrintf(TRUE, FALSE, "[%s]: assign task,insId:%d,fileName:%s\n", __FUNCTION__, i, (char*)(pMsg->content));
 			if (TRUE == instance->StartReceiveFile(pMsg))
 			{
-                er_clt_start_post_file_ack msg;
+                ser_clt_start_post_file_ack msg;
 				msg.InstanceNo = i;
 				post(MAKEIID(FILE_APP_ID_CLIENT, pMsg->srcid), EV_SER_CLT_START_POST_FILE_ACK, &msg, sizeof(msg), pMsg->srcnode);
 				return;

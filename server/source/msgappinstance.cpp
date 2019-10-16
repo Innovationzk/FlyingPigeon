@@ -143,15 +143,21 @@ void MsgAppInstance::SendMsg(CMessage* const pMsg)
 	OspPrintf(TRUE, FALSE, "[%s]: called\n", __FUNCTION__);
 
 	clt_ser_post_msg_ntf* srcMsg = (clt_ser_post_msg_ntf*)(pMsg->content);
-	OspPrintf(TRUE, FALSE, "[%s]: target clients number is:%d,msg content is:%s\n", __FUNCTION__, srcMsg->clientNum, srcMsg->msgContent);
 
 	u32 srcClientNo = msgApp.getOnlineClientNo(pMsg->srcnode);
+    if (0 == srcClientNo)
+    {
+        OspPrintf(TRUE, FALSE, "[%s]: error: client%d ont exist\n", __FUNCTION__, srcClientNo);
+        return;
+    }
+    OspPrintf(TRUE, FALSE, "[%s]: srcClientNo:%d,target clientsNum:%d,msg content is:%s\n", __FUNCTION__, srcClientNo,srcMsg->clientNum, srcMsg->msgContent);
 	for (int i = 0; i < srcMsg->clientNum; i++)
 	{
 		u32 dstClientNo = srcMsg->clientNo[i];
 		if (msgApp.isOnlineClient(dstClientNo))  // 目标客户端在线，直接发送
 		{
 			u32 dstClientNode = msgApp.getOnlineClientNode(dstClientNo);
+            OspPrintf(TRUE, FALSE, "[%s]: send msg to clientNo:%d\n", __FUNCTION__, dstClientNode);
 			ser_clt_post_msg_ntf dstMsg;
 			dstMsg.srcClientNo = srcClientNo;
 			strcpy(dstMsg.msgContent, srcMsg->msgContent);
